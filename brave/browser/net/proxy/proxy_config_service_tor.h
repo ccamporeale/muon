@@ -5,23 +5,43 @@
 #ifndef BRAVE_BROWSER_NET_PROXY_PROXY_CONFIG_SERVICE_TOR_H_
 #define BRAVE_BROWSER_NET_PROXY_PROXY_CONFIG_SERVICE_TOR_H_
 
+#include <algorithm>
+#include <limits>
 #include <string>
 
 #include "base/compiler_specific.h"
+#include "base/synchronization/waitable_event.h"
+#include "base/values.h"
+#include "brave/common/tor/tor.mojom.h"
+#include "content/public/browser/browser_thread.h"
+#include "content/public/common/service_manager_connection.h"
 #include "net/base/net_errors.h"
 #include "net/base/net_export.h"
 #include "net/proxy/proxy_config.h"
 #include "net/proxy/proxy_config_service.h"
-
-class GURL;
+#include "vendor/brightray/browser/browser_client.h"
+#include "vendor/brightray/browser/net_log.h"
+#include "vendor/brightray/browser/url_request_context_getter.h"
+#include "url/third_party/mozilla/url_parse.h"
 
 namespace net {
+
+const char kSocksProxy[] = "socks5";
 
 // Implementation of ProxyConfigService that returns a tor specific result.
 class NET_EXPORT ProxyConfigServiceTor : public ProxyConfigService {
  public:
-  explicit ProxyConfigServiceTor(const GURL& url);
+  explicit ProxyConfigServiceTor(const std::string tor_path,
+    const std::string tor_proxy);
   ~ProxyConfigServiceTor() override;
+
+  static void TorSetProxy(
+    scoped_refptr<brightray::URLRequestContextGetter>
+      url_request_context_getter,
+    const std::string tor_proxy,
+    const std::string tor_path,
+    const bool isolated_storage,
+    const base::FilePath partition_path);
 
   // ProxyConfigService methods:
   void AddObserver(Observer* observer) override {}
@@ -35,8 +55,20 @@ class NET_EXPORT ProxyConfigServiceTor : public ProxyConfigService {
   // Generate a new 128 bit random tag
   std::string GenerateNewPassword();
 
+  void LaunchTorProcess(base::WaitableEvent* tor_launched,
+                        const std::string& tor_path,
+                        const std::string& tor_host,
+                        const std::string& tor_port);
+  void OnTorLauncherCrashed();
+  void OnTorLaunched(base::WaitableEvent* tor_launched, bool result);
+
+
   ProxyConfig config_;
-  GURL url_;
+  tor::mojom::TorLauncherPtr tor_launcher_;
+
+  std::string scheme_;
+  std::string host_;
+  std::string port_;
   std::string username_;
 };
 
