@@ -26,7 +26,7 @@ const int kTorPasswordLength = 16;
 
 ProxyConfigServiceTor::ProxyConfigServiceTor(const std::string tor_path,
   const std::string tor_proxy) {
-    if (!tor_path.size() && !tor_proxy.size()) {
+    if (tor_path.length() && tor_proxy.length()) {
       url::Parsed url;
       url::ParseStandardURL(
         tor_proxy.c_str(),
@@ -118,7 +118,7 @@ void ProxyConfigServiceTor::TorSetProxy(
   // per partition_path so there is no need to cache password per origin
   std::string origin = partition_path.DirName().BaseName().value();
   std::unique_ptr<net::ProxyConfigServiceTor>
-    config(new ProxyConfigServiceTor(tor_proxy, tor_path));
+    config(new ProxyConfigServiceTor(tor_path, tor_proxy));
   config->SetUsername(origin);
   proxy_service->ResetConfigService(std::move(config));
 }
