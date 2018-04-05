@@ -12,8 +12,6 @@
 #include "base/strings/string_number_conversions.h"
 #include "base/strings/string_util.h"
 #include "chrome/common/chrome_paths.h"
-#include "content/browser/storage_partition_impl_map.h"
-#include "content/public/browser/site_instance.h"
 #include "crypto/random.h"
 #include "net/proxy/proxy_service.h"
 #include "net/url_request/url_request_context.h"

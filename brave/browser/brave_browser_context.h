@@ -173,7 +173,6 @@ class BraveBrowserContext : public Profile {
   const std::string partition_;
   std::unique_ptr<base::WaitableEvent> ready_;
   bool isolated_storage_;
-
   bool in_memory_;
   std::string tor_proxy_;
   std::string tor_path_;
