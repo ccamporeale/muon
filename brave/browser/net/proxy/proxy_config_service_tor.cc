@@ -25,6 +25,7 @@ const int kTorPasswordLength = 16;
 ProxyConfigServiceTor::ProxyConfigServiceTor(const std::string tor_path,
   const std::string tor_proxy) {
     if (tor_path.length() && tor_proxy.length()) {
+      tor_path_ = tor_path;
       url::Parsed url;
       url::ParseStandardURL(
         tor_proxy.c_str(),
@@ -47,31 +48,26 @@ ProxyConfigServiceTor::ProxyConfigServiceTor(const std::string tor_path,
                       tor_proxy.begin() + url.port.begin + url.port.len);
       }
 
-      base::WaitableEvent* tor_launched =
-        new base::WaitableEvent(
-          base::WaitableEvent::ResetPolicy::MANUAL,
-          base::WaitableEvent::InitialState::NOT_SIGNALED);
       BrowserThread::PostTask(
           BrowserThread::PROCESS_LAUNCHER, FROM_HERE,
           base::Bind(&ProxyConfigServiceTor::LaunchTorProcess,
-                     base::Unretained(this),
-                     tor_launched,
-                     tor_path,
-                     host_,
-                     port_));
-      tor_launched->Wait();
-      delete tor_launched;
+                     base::Unretained(this)));
     }
     config_.proxy_rules().ParseFromString(std::string(scheme_ + "://" + host_
       + ":" + port_));
 }
 
+void ProxyConfigServiceTor::OnTorCrashed(int32_t pid) {
+  LOG(ERROR) << "Tor Process(" << pid << ") Crashed";
+  BrowserThread::PostTask(
+      BrowserThread::PROCESS_LAUNCHER, FROM_HERE,
+      base::Bind(&ProxyConfigServiceTor::LaunchTorProcess,
+                 base::Unretained(this)));
+}
+
 ProxyConfigServiceTor::~ProxyConfigServiceTor() {}
 
-void ProxyConfigServiceTor::LaunchTorProcess(base::WaitableEvent* tor_launched,
-                                           const std::string& tor_path,
-                                           const std::string& tor_host,
-                                           const std::string& tor_port) {
+void ProxyConfigServiceTor::LaunchTorProcess() {
   content::ServiceManagerConnection::GetForProcess()
     ->GetConnector()
     ->BindInterface(tor::mojom::kTorServiceName,
@@ -87,17 +83,18 @@ void ProxyConfigServiceTor::LaunchTorProcess(base::WaitableEvent* tor_launched,
   args.push_back("--defaults-torrc");
   args.push_back("/nonexistent");
   args.push_back("--SocksPort");
-  args.push_back(tor_host + ":" + tor_port);
+  args.push_back(host_ + ":" + port_);
   base::FilePath user_data_dir;
   PathService::Get(chrome::DIR_USER_DATA, &user_data_dir);
   if (!user_data_dir.empty()) {
     args.push_back("--DataDirectory");
     args.push_back(user_data_dir.value());
   }
-  tor_launcher_->Launch(base::FilePath(tor_path), args,
+  tor_launcher_->Launch(base::FilePath(tor_path_), args,
                         base::Bind(&ProxyConfigServiceTor::OnTorLaunched,
-                                   base::Unretained(this),
-                                   tor_launched));
+                                   base::Unretained(this)));
+  tor_launcher_->SetCrashHandler(base::Bind(&ProxyConfigServiceTor::OnTorCrashed,
+                        base::Unretained(this)));
 }
 
 void ProxyConfigServiceTor::TorSetProxy(
@@ -125,16 +122,14 @@ void ProxyConfigServiceTor::OnTorLauncherCrashed() {
   LOG(ERROR) << "Tor Launcher Crashed";
 }
 
-void ProxyConfigServiceTor::OnTorLaunched(base::WaitableEvent* tor_launched,
-                                        bool result) {
+void ProxyConfigServiceTor::OnTorLaunched(bool result) {
   if (!result)
     LOG(ERROR) << "Tor Launching Failed";
-  tor_launched->Signal();
 }
 
 ProxyConfigServiceTor::ConfigAvailability
     ProxyConfigServiceTor::GetLatestProxyConfig(ProxyConfig* config) {
-  if (scheme_ != kSocksProxy)
+  if (scheme_ != kSocksProxy || host_ != kTorHost || port_ != kTorPort)
     return CONFIG_UNSET;
   std::string password = GenerateNewPassword();
   std::string url = std::string(scheme_ + "://" + username_ + ":" + password +

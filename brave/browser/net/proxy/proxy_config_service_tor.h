@@ -27,6 +27,8 @@
 namespace net {
 
 const char kSocksProxy[] = "socks5";
+const char kTorHost[] = "127.0.0.1";
+const char kTorPort[] = "9050";
 
 // Implementation of ProxyConfigService that returns a tor specific result.
 class NET_EXPORT ProxyConfigServiceTor : public ProxyConfigService {
@@ -55,12 +57,10 @@ class NET_EXPORT ProxyConfigServiceTor : public ProxyConfigService {
   // Generate a new 128 bit random tag
   std::string GenerateNewPassword();
 
-  void LaunchTorProcess(base::WaitableEvent* tor_launched,
-                        const std::string& tor_path,
-                        const std::string& tor_host,
-                        const std::string& tor_port);
+  void LaunchTorProcess();
   void OnTorLauncherCrashed();
-  void OnTorLaunched(base::WaitableEvent* tor_launched, bool result);
+  void OnTorCrashed(int32_t pid);
+  void OnTorLaunched(bool result);
 
 
   ProxyConfig config_;
@@ -70,6 +70,7 @@ class NET_EXPORT ProxyConfigServiceTor : public ProxyConfigService {
   std::string host_;
   std::string port_;
   std::string username_;
+  std::string tor_path_;
 };
 
 }  // namespace net
